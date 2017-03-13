@@ -21,6 +21,8 @@ Disclaimer: It's only configured to search for specific event ids, so there may 
 ## Installation
 
 Download the Scripts folder and place it under C:\
+
 Open ad-audit.ps1 in an editor and change the config settings.
+
 Run manually or schedule it to run from task scheduler.
 
