@@ -189,6 +189,13 @@ $GraylogResults| % {
     if ($_.AttributeLDAPDisplayName -eq 'member' ) {
       $Details = "Directory Service group modified:  """ + (Get-CName ($_.AttributeValue))  + """ $LDAPOperationType"
     }
+    # EventId:5136 AND pwdLastSetl
+    if ($_.AttributeLDAPDisplayName -eq 'pwdLastSet' ) { 
+      if ($CorrelationType -eq 'add' -and $_.AttributeValue -eq -1) { $Details = "User is not required to change password at next logon" 
+      } elseif ($CorrelationType -eq 'add' -and $_.AttributeValue -eq 0) { $Details = "User must change password at next logon" 
+      } else { $skip=1 }
+    }    
+
   # Use $DbEventId lookup for default Details
   } else {
     $Details = $DbEventId.Details
@@ -214,7 +221,6 @@ $GraylogResults| % {
   }
 }
 #$email_body
-
 
 if ($email_body.Length -gt 0) { 
   $msg=new-object System.Net.Mail.MailMessage
