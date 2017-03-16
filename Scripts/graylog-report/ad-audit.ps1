@@ -64,7 +64,7 @@ $cred=New-object System.Management.Automation.PSCredential $GLUser,$GLSecurePass
 $query='Channel:Security AND ( 
             EventID:(4728 4729 4756 4757 4761 4762 4740 4767 4724 4722 4725 5139)
             OR (EventID:4738 AND NOT OldUacValue:"-")
-            OR (EventID:5136 AND AttributeLDAPDisplayName:(sAMAccountName physicalDeliveryOfficeName description accountExpires telephoneNumber userAccountControl member))
+            OR (EventID:5136 AND AttributeLDAPDisplayName:(sAMAccountName physicalDeliveryOfficeName description accountExpires telephoneNumber userAccountControl member pwdLastSet displayName givenName sn initials mDBStorageQuota mDBOverQuotaLimit mDBOverHardQuotaLimit))
             OR (EventID:(5141 5137) AND ObjectClass:(user group computer))
         ) AND NOT _exists_:Message'
 
