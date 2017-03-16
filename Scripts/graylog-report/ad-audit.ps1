@@ -15,6 +15,14 @@ $smtpserver="smtp.mydomain.com"
 #define critical AD Groups (will be marked severity critical)
 $ADCriticalGroups = 'Domain Admins', 'Enterprise Admins', 'Schema Admins'
 
+
+
+#search "from" datetime (only used for first run, otherwise start from previous "to" datetime)
+$FromDateTime=(Get-Date (Get-Date).AddHours(-24).ToUniversalTime() -Format s) + '.00Z'
+#search "to" datetime (current datetime)
+$ToDateTime=(Get-Date (Get-Date).ToUniversalTime() -Format s) + '.00Z'
+
+
 #load functions
 . C:\Scripts\powershell-libraries\get-cname.ps1
 . C:\Scripts\powershell-libraries\get-accountfromsid.ps1
@@ -24,6 +32,9 @@ $ADCriticalGroups = 'Domain Admins', 'Enterprise Admins', 'Schema Admins'
 CD C:\Scripts\graylog-report
 
 $DbEventIds = Import-CSV 'data\ad-events.csv'
+
+#retrieve last run time (if file exists)
+if (Test-Path 'data\ad-audit-lastrun.txt') { $FromDateTime = Get-Content 'data\ad-audit-lastrun.txt' }
 
 #Used by URLEncode
 Add-Type -AssemblyName System.Web
@@ -71,7 +82,7 @@ $query='Channel:Security AND (
 
 $query=[System.Web.HttpUtility]::UrlEncode($query)
 
-$GraylogResults = Invoke-RestMethod -Uri "$graylogserver/search/universal/relative?query=$query&range=$range&limit=$limit&filter=streams%3A$stream" -Headers @{"Accept"="application/json"} -Credential $cred 
+$GraylogResults = Invoke-RestMethod -Uri "$graylogserver/search/universal/absolute?query=$query&from=$FromDateTime&to=$ToDateTime&limit=$limit&filter=streams%3A$stream" -Headers @{"Accept"="application/json"} -Credential $cred 
 
 $GraylogResults = $GraylogResults.messages.message
 
@@ -236,3 +247,6 @@ if ($email_body.Length -gt 0) {
   $smtp.host=$smtpserver
   $smtp.Send($msg)
 }
+
+#update last run time
+$ToDateTime > 'data\ad-audit-lastrun.txt'
