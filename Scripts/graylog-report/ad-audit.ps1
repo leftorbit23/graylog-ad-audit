@@ -23,7 +23,8 @@ $ADCriticalGroups = 'Domain Admins', 'Enterprise Admins', 'Schema Admins'
 
 CD C:\Scripts\graylog-report
 
-$DbEventIds = Import-CSV 'database\ad-events.csv'
+$DbEventIds = Import-CSV 'data
+\ad-events.csv'
 
 #Used by URLEncode
 Add-Type -AssemblyName System.Web
