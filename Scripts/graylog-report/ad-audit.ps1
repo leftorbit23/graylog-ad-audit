@@ -91,6 +91,42 @@ $GraylogResults | % {
   }
 }
 
+## City?
+## Country?
+## Company name?
+## Division?
+## EmployeeID
+## EmployeeNumber
+## facsimileTelephoneNumber
+## HomeDirectory
+## HomeDrive
+## HomePhone
+## mail
+## mailNickname
+## mDBUseDefaults (quota)
+## Organization??
+## physicalDeliveryOfficeName?
+## PostalCode
+## ScriptPath?
+## st / State
+## StreetAddress
+## Title
+
+
+#AttributeLDAPDisplayName lookup table for EventID 5136
+$AttributeLDAPDisplayNameList = @{
+ "sAMAccountName" = "Name";
+ "displayName" = "Display Name";
+ "givenName" = "First Name";
+ "sn" = "Last Name";
+ "initials" = "Initials";
+ "physicalDeliveryOfficeName" = "Office";
+ "description" = "Description";
+ "telephoneNumber" = "Telephone Number";
+ "mDBStorageQuota" = "Exchange Soft Quota"
+ "mDBOverQuotaLimit" = "Exchange Send Quota";
+ "mDBOverHardQuotaLimit" = "Exchange Hard Quota";
+}
 
 $email_body = ""
 $AuditEventCount = 0
@@ -145,39 +181,26 @@ $GraylogResults| % {
     } else {
       $CorrelationType = 'none';
     }          
-    # EventId:5136 AND sAMAccountName
-    if ($_.AttributeLDAPDisplayName -eq 'sAMAccountName' ) {
-      if ($CorrelationType -eq 'add') {$Details = "Name changed from """ +  ( $PreviousAttributeValue )+ """ to """ + ($_.AttributeValue)  + """ "
-      } elseif  ($CorrelationType -eq 'delete') {$skip=1
-      } else {$Details = "Name changed to """ + $_.AttributeValue  + """"}
-    }
-    # EventId:5136 AND physicalDeliveryOfficeName
-    if ($_.AttributeLDAPDisplayName -eq 'physicalDeliveryOfficeName' ) {
-      if ($CorrelationType -eq 'add') {$Details = "Office changed from """ +  ( $PreviousAttributeValue )+ """ to """ + ($_.AttributeValue)  + """ "
-      } elseif  ($CorrelationType -eq 'delete') {$skip=1
-      } else {$Details = "Office """ + $_.AttributeValue  + """ $LDAPOperationType"}
-    }
-    # EventId:5136 AND description
-    if ($_.AttributeLDAPDisplayName -eq 'description' ) {
-      if ($CorrelationType -eq 'add') {$Details = "Description changed from """ +  ( $PreviousAttributeValue )+ """ to """ + ($_.AttributeValue)  + """ "
-      } elseif  ($CorrelationType -eq 'delete') {$skip=1
-      } else {$Details = "Description """ + $_.AttributeValue  + """ $LDAPOperationType"}
+    # EventId:5136 AND (sAMAccountName displayName givenName sn initials physicalDeliveryOfficeName description telephoneNumber mDBStorageQuota mDBOverQuotaLimit mDBOverHardQuotaLimit)
+    $AttributeLDAPDisplayName = $_.AttributeLDAPDisplayName
+    $AttributeValue = $_.AttributeValue
+    # Loop through AttributeLDAPDisplayName lookup hash table
+    $AttributeLDAPDisplayNameList.GetEnumerator() | % {
+      if ($AttributeLDAPDisplayName -eq $_.Name ) {
+        if ($CorrelationType -eq 'add') {$Details = $_.Value + " changed from """ +  ( $PreviousAttributeValue )+ """ to """ + ($AttributeValue)  + """ "
+        } elseif  ($CorrelationType -eq 'delete') {$skip=1
+        #} else {$Details = "Name changed to """ + $AttributeValue  + """"}
+        } else {$Details = $_.Value + " """ + $AttributeValue  + """ $LDAPOperationType"}
+      }
     }
     # EventId:5136 AND accountExpires
     if ($_.AttributeLDAPDisplayName -eq 'accountExpires' ) { 
-      if ($_.AttributeValue -eq 0) { $AccountExpires = 'Never' } else { $AccountExpires = Get-Date (Get-Date ([DateTime]::FromFileTime($_.AttributeValue)).ToString()).ToUniversalTime() -Format G}
+      if ($_.AttributeValue -eq 0  -or $_.AttributeValue -eq 9223372036854775807) { $AccountExpires = 'Never' } else { $AccountExpires = Get-Date (Get-Date ([DateTime]::FromFileTime($_.AttributeValue)).ToString()).ToUniversalTime() -Format G}
       if ($CorrelationType -eq 'add') {
-        if ($PreviousAttributeValue -eq 0) { $PreviousAccountExpires = 'Never' } else { $PreviousAccountExpires = Get-Date (Get-Date ([DateTime]::FromFileTime($_.AttributeValue)).ToString()).ToUniversalTime() -Format G}
+        if ($PreviousAttributeValue -eq 0 -or $PreviousAttributeValue -eq 9223372036854775807) { $PreviousAccountExpires = 'Never' } else { $PreviousAccountExpires = Get-Date (Get-Date ([DateTime]::FromFileTime($_.AttributeValue)).ToString()).ToUniversalTime() -Format G}
         $Details = "Account Expires changed from """ +  ( $PreviousAccountExpires )+ """ to """ + ($AccountExpires)  + """ "
       } elseif  ($CorrelationType -eq 'delete') {$skip=1
-      } else {$Details = "Account Expires """ + $AccountExpires  + """ $LDAPOperationType"}
-      
-    }
-    # EventId:5136 AND telephoneNumber
-    if ($_.AttributeLDAPDisplayName -eq 'telephoneNumber' ) {
-      if ($CorrelationType -eq 'add') {$Details = "Telephone Number changed from """ +  ( $PreviousAttributeValue )+ """ to """ + ($_.AttributeValue)  + """ "
-      } elseif  ($CorrelationType -eq 'delete') {$skip=1
-      } else {$Details = "Telephone Number """ + $_.AttributeValue  + """ $LDAPOperationType"}
+      } else {$Details = "Account Expires """ + $AccountExpires  + """ $LDAPOperationType"}      
     }
     # EventId:5136 AND userAccountControl
     if ($_.AttributeLDAPDisplayName -eq 'userAccountControl' ) { 
