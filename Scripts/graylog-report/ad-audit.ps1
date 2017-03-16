@@ -23,8 +23,7 @@ $ADCriticalGroups = 'Domain Admins', 'Enterprise Admins', 'Schema Admins'
 
 CD C:\Scripts\graylog-report
 
-$DbEventIds = Import-CSV 'data
-\ad-events.csv'
+$DbEventIds = Import-CSV 'data\ad-events.csv'
 
 #Used by URLEncode
 Add-Type -AssemblyName System.Web
@@ -91,28 +90,6 @@ $GraylogResults | % {
     }
   }
 }
-
-## City?
-## Country?
-## Company name?
-## Division?
-## EmployeeID
-## EmployeeNumber
-## facsimileTelephoneNumber
-## HomeDirectory
-## HomeDrive
-## HomePhone
-## mail
-## mailNickname
-## mDBUseDefaults (quota)
-## Organization??
-## physicalDeliveryOfficeName?
-## PostalCode
-## ScriptPath?
-## st / State
-## StreetAddress
-## Title
-
 
 #AttributeLDAPDisplayName lookup table for EventID 5136
 $AttributeLDAPDisplayNameList = @{
