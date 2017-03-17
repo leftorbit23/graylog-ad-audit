@@ -36,6 +36,10 @@ $DbEventIds = Import-CSV 'data\ad-events.csv'
 #retrieve last run time (if file exists)
 if (Test-Path 'data\ad-audit-lastrun.txt') { $FromDateTime = Get-Content 'data\ad-audit-lastrun.txt' }
 
+#function to update last run time
+function Update-LastRunTime {
+  $ToDateTime > 'data\ad-audit-lastrun.txt'
+}
 #Used by URLEncode
 Add-Type -AssemblyName System.Web
 
@@ -75,7 +79,7 @@ $cred=New-object System.Management.Automation.PSCredential $GLUser,$GLSecurePass
 $query='Channel:Security AND ( 
             EventID:(4728 4729 4756 4757 4761 4762 4740 4767 4724 4722 4725 5139)
             OR (EventID:4738 AND NOT OldUacValue:"-")
-            OR (EventID:5136 AND AttributeLDAPDisplayName:(sAMAccountName physicalDeliveryOfficeName description accountExpires telephoneNumber userAccountControl member pwdLastSet displayName givenName sn initials mDBStorageQuota mDBOverQuotaLimit mDBOverHardQuotaLimit))
+            OR (EventID:5136 AND AttributeLDAPDisplayName:(sAMAccountName physicalDeliveryOfficeName description accountExpires telephoneNumber userAccountControl member pwdLastSet displayName givenName sn initials mDBStorageQuota mDBOverQuotaLimit mDBOverHardQuotaLimit dNSHostName))
             OR (EventID:(5141 5137) AND ObjectClass:(user group computer))
         ) AND NOT _exists_:Message'
 
@@ -88,7 +92,12 @@ $GraylogResults = $GraylogResults.messages.message
 
 #$GraylogResults
 
-if ($GraylogResults.Length -eq 0 ) { exit }
+#Exit script if the search returns no results
+if ($GraylogResults.Length -eq 0 ) { 
+  Update-LastRunTime
+ 
+  exit 
+}
 
 #Create correlation arrays. Allows us to combine multiple (delete&add) ldap events into a single event.
 $OpCorrelationCount = @{}
@@ -115,6 +124,7 @@ $AttributeLDAPDisplayNameList = @{
  "mDBStorageQuota" = "Exchange Soft Quota"
  "mDBOverQuotaLimit" = "Exchange Send Quota";
  "mDBOverHardQuotaLimit" = "Exchange Hard Quota";
+ "dNSHostName" = "Computer Name";
 }
 
 $email_body = ""
@@ -129,8 +139,17 @@ $GraylogResults| % {
   $DbEventId = $DbEventIds | ? { $_.EventId -eq $EventID }
   # Use ObjectClass to set ObjectType if available. Otherwise use lookup from $DbEventId.
   if ($_.ObjectClass.length -ne 0) { $ObjectType =  (Get-Culture).textinfo.totitlecase($_.ObjectClass)  } else {  $ObjectType = $DbEventId.ObjectType }
+  # Use lookup from $DbEventId to set ChangeType
+  $ChangeType = $DbEventId.ChangeType
   # Use TargetSid to set ObjectName if available. Otherwise use ObjectDN.
-  if ($_.TargetSid.length -ne 0) {$ObjectName = (Get-CNameFromSID ($_.TargetSid))} else {  $ObjectName = (Get-CName($_.ObjectDN )) }
+  if ($_.TargetSid.length -ne 0) {
+    $ObjectName = (Get-CNameFromSID ($_.TargetSid))
+  } elseif ($_.ObjectDN.length -ne 0) {
+    $ObjectName = (Get-CName($_.ObjectDN )) 
+  } else {
+    #5139 (rename) uses NewObjectDN
+    $ObjectName = ''
+  }
   # Set severity level
   if ($ADCriticalGroups -contains $_.TargetUserName ) {
     $Severity = '<b><font color=red>Critical</font></b>'
@@ -170,7 +189,10 @@ $GraylogResults| % {
     } else {
       $CorrelationType = 'none';
     }          
-    # EventId:5136 AND (sAMAccountName displayName givenName sn initials physicalDeliveryOfficeName description telephoneNumber mDBStorageQuota mDBOverQuotaLimit mDBOverHardQuotaLimit)
+    # Set ChangeType to "Added" when sAMAccountName is set for the first time
+    if ($CorrelationType -eq 'none' -and $_.AttributeLDAPDisplayName -eq 'sAMAccountName'  ) {$ChangeType = 'Added'}
+
+    # EventId:5136 AND (sAMAccountName displayName givenName sn initials physicalDeliveryOfficeName description telephoneNumber mDBStorageQuota mDBOverQuotaLimit mDBOverHardQuotaLimit dNSHostName)
     $AttributeLDAPDisplayName = $_.AttributeLDAPDisplayName
     $AttributeValue = $_.AttributeValue
     # Loop through AttributeLDAPDisplayName lookup hash table
@@ -219,7 +241,7 @@ $GraylogResults| % {
     $email_body += "<tr><td colspan=2>--------------------------------------------------</td></tr>" ; 
     $email_body += "<tr><td width=140>Severity</td><td>" + $Severity + "</td></tr>" ; 
     $email_body += "<tr><td colspan=2>--------------------------------------------------</td></tr>" ; 
-    $email_body += "<tr><td>Change Type:</td><td>" + $DbEventId.ChangeType + "</td></tr>" ; 
+    $email_body += "<tr><td>Change Type:</td><td>" + $ChangeType + "</td></tr>" ; 
     $email_body += "<tr><td>Object Type:</td><td>" + $ObjectType + "</td></tr>" ; 
     $email_body += "<tr><td>When Changed:</td><td>" + (Get-Date    $_.timestamp -format G ) + "</td></tr>" ; 
     $email_body += "<tr><td>Who Changed:</td><td>" + (Get-AccountFromSID ($_.SubjectUserSid)) + "</td></tr>" ; 
@@ -249,4 +271,4 @@ if ($email_body.Length -gt 0) {
 }
 
 #update last run time
-$ToDateTime > 'data\ad-audit-lastrun.txt'
+Update-LastRunTime
